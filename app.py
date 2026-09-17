@@ -108,11 +108,10 @@ with st.sidebar:
     st.subheader("⚡ 1-Click Hackathon Demo")
     demo_case = st.selectbox(
         "Select Clinical Case Study:",
-        options=["case_a", "case_c", "case_custom"],
+        options=["case_a", "case_custom"],
         format_func=lambda k: {
             "case_a": "Case A: Sarah Jenkins (Day 4 Knee - Normal)",
-            "case_c": "Case B: Robert Chen (Day 3 Hip - DVT Red Flag)",
-            "case_custom": "Case C: ➕ Custom Patient Case (Upload Your Own)"
+            "case_custom": "➕ Custom Patient Case (Upload Your Own)"
         }[k],
         key="selected_case_select"
     )

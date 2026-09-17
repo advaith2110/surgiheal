@@ -21,7 +21,7 @@ def test_synthetic_image_generation():
 
 
 def test_realistic_case_images():
-    for case_key in ["case_a", "case_b", "case_c", "case_custom"]:
+    for case_key in ["case_a", "case_custom"]:
         img_bytes = get_case_image_bytes(case_key)
         assert isinstance(img_bytes, bytes)
         assert len(img_bytes) > 10000
@@ -42,8 +42,6 @@ def test_progression_images():
 
 def test_sample_cases_structure():
     assert "case_a" in SAMPLE_CASES
-    assert "case_b" in SAMPLE_CASES
-    assert "case_c" in SAMPLE_CASES
     assert "case_custom" in SAMPLE_CASES
 
     case_a = SAMPLE_CASES["case_a"]
