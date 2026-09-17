@@ -33,7 +33,7 @@ PROGRESSION_IMAGE_MAP = {
     },
     "case_custom": {
         "day_1": PROGRESSION_DIR / "day_1_hip.jpg",
-        "final_day": PROGRESSION_DIR / "day_14_hip.jpg",
+        "final_day": PROGRESSION_DIR / "custom_final.jpg",
     },
 }
 
