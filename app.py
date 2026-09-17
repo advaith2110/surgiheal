@@ -6,7 +6,7 @@ import io
 
 import config
 import ai_service
-from sample_data import SAMPLE_CASES, create_synthetic_incision_image, get_case_image_bytes
+from sample_data import SAMPLE_CASES, create_synthetic_incision_image, get_case_image_bytes, get_progression_image_bytes
 from models import WoundAnalysisResult, DischargeSummary, TriageAssessment
 
 # Page configuration
@@ -208,18 +208,21 @@ with tab_wound:
         )
 
         image_bytes = None
+        uploaded_current_photo = False
         if photo_source == "Upload Photo (PNG/JPG)":
             uploaded_file = st.file_uploader("Upload incision photo:", type=["png", "jpg", "jpeg"], key="wound_file_uploader")
             if uploaded_file:
                 image_bytes = uploaded_file.getvalue()
                 st.session_state["uploaded_wound_img"] = image_bytes
                 st.session_state["uploaded_wound_case"] = st.session_state.patient_case_key
+                uploaded_current_photo = True
                 st.image(image_bytes, caption=f"Uploaded Incision Photo — {active_case['name']}", use_container_width=True)
             elif (
                 "uploaded_wound_img" in st.session_state
                 and st.session_state.get("uploaded_wound_case") == st.session_state.patient_case_key
             ):
                 image_bytes = st.session_state["uploaded_wound_img"]
+                uploaded_current_photo = True
                 st.image(image_bytes, caption=f"Uploaded Incision Photo — {active_case['name']} (Active)", use_container_width=True)
             else:
                 image_bytes = get_case_image_bytes(st.session_state.patient_case_key)
@@ -231,6 +234,7 @@ with tab_wound:
                 image_bytes = cam_file.getvalue()
                 st.session_state["uploaded_wound_img"] = image_bytes
                 st.session_state["uploaded_wound_case"] = st.session_state.patient_case_key
+                uploaded_current_photo = True
                 st.image(image_bytes, caption="Webcam Incision Photo", use_container_width=True)
             else:
                 image_bytes = get_case_image_bytes(st.session_state.patient_case_key)
@@ -327,6 +331,29 @@ with tab_wound:
                 for rf in result.red_flags:
                     st.markdown(f"- ⚠️ `{rf}`")
 
+    st.divider()
+    # Historical Progression Comparison
+    st.subheader("📈 Longitudinal Incision Healing Progression")
+    st.caption("Track visual incision closure across post-operative recovery milestones.")
+
+    pcol1, pcol2, pcol3 = st.columns(3)
+    with pcol1:
+        st.markdown("**Post-Op Day 1** (Discharge Baseline)")
+        st.image(get_progression_image_bytes("day_1", st.session_state.patient_case_key), caption=f"Day 1 ({active_case['procedure_name']} baseline)", use_container_width=True)
+        st.caption("Erythema: 1/10 | Pain: 5/10 | SSI Risk: 5%")
+
+    with pcol2:
+        current_label = "Uploaded Photo / Current Inspection" if uploaded_current_photo else f"Post-Op Day {active_case['post_op_day']} (Current)"
+        image_caption = "Uploaded wound photo" if uploaded_current_photo else f"Day {active_case['post_op_day']} clinical case photo"
+        st.markdown(f"**{current_label}**")
+        st.image(image_bytes, caption=image_caption, use_container_width=True)
+        st.caption(f"Erythema: {result.erythema_score}/10 | Pain: {curr_pain}/10 | SSI Risk: {result.infection_risk_percentage}%")
+
+    with pcol3:
+        st.markdown("**Final Day** (Healed Incision)")
+        st.image(get_progression_image_bytes("final_day", st.session_state.patient_case_key), caption=f"Final day ({active_case['procedure_name']} healed target)", use_container_width=True)
+        st.caption("Target Erythema: 0/10 | Target SSI Risk: < 3%")
+
 # ==========================================
 # TAB 2: RECOVERY ROADMAP & MEDICATIONS
 # ==========================================
@@ -391,6 +418,8 @@ with tab_roadmap:
             })
         df_meds = pd.DataFrame(med_data)
         st.dataframe(df_meds, use_container_width=True, hide_index=True)
+
+        st.divider()
 
         st.divider()
         st.markdown("### 🗓️ Recovery Milestone Checklist")
