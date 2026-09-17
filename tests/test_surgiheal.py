@@ -1,5 +1,11 @@
 import pytest
-from sample_data import create_synthetic_incision_image, SAMPLE_CASES
+import os
+from sample_data import (
+    create_synthetic_incision_image,
+    get_case_image_bytes,
+    get_progression_image_bytes,
+    SAMPLE_CASES
+)
 from models import WoundAnalysisResult, DischargeSummary, TriageAssessment
 import ai_service
 
@@ -14,15 +20,40 @@ def test_synthetic_image_generation():
     assert len(img_infection) > 1000
 
 
+def test_realistic_case_images():
+    for case_key in ["case_a", "case_b", "case_c", "case_custom"]:
+        img_bytes = get_case_image_bytes(case_key)
+        assert isinstance(img_bytes, bytes)
+        assert len(img_bytes) > 10000
+        # Verify file exists on disk
+        img_path = SAMPLE_CASES[case_key]["image_path"]
+        assert os.path.exists(img_path)
+
+
+def test_progression_images():
+    img_day1 = get_progression_image_bytes("day_1")
+    assert isinstance(img_day1, bytes)
+    assert len(img_day1) > 10000
+
+    img_day14 = get_progression_image_bytes("day_14")
+    assert isinstance(img_day14, bytes)
+    assert len(img_day14) > 10000
+
+
 def test_sample_cases_structure():
     assert "case_a" in SAMPLE_CASES
     assert "case_b" in SAMPLE_CASES
     assert "case_c" in SAMPLE_CASES
+    assert "case_custom" in SAMPLE_CASES
 
     case_a = SAMPLE_CASES["case_a"]
     assert case_a["name"] == "Sarah Jenkins"
     assert isinstance(case_a["discharge"], DischargeSummary)
     assert isinstance(case_a["expected_analysis"], WoundAnalysisResult)
+
+    case_custom = SAMPLE_CASES["case_custom"]
+    assert case_custom["id"] == "PAT-USER"
+    assert isinstance(case_custom["discharge"], DischargeSummary)
 
 
 def test_ai_service_wound_analysis_normal():

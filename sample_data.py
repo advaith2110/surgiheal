@@ -1,4 +1,6 @@
 import io
+import os
+from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 from models import (
     PatientProfile,
@@ -8,6 +10,68 @@ from models import (
     RecoveryMilestone,
     TriageAssessment
 )
+
+BASE_DIR = Path(__file__).resolve().parent
+ASSETS_DIR = BASE_DIR / "assets" / "cases"
+PROGRESSION_DIR = BASE_DIR / "assets" / "progression"
+
+CASE_IMAGE_MAP = {
+    "case_a": ASSETS_DIR / "case_a_knee.jpg",
+    "case_b": ASSETS_DIR / "case_b_appendix.jpg",
+    "case_c": ASSETS_DIR / "case_c_hip.jpg",
+    "case_custom": ASSETS_DIR / "case_a_knee.jpg",
+}
+
+PROGRESSION_IMAGE_MAP = {
+    "case_a": {
+        "day_1": PROGRESSION_DIR / "day_1_knee_baseline.jpg",
+        "final_day": PROGRESSION_DIR / "day_14_knee_healed.jpg",
+    },
+    "case_c": {
+        "day_1": PROGRESSION_DIR / "day_1_hip.jpg",
+        "final_day": PROGRESSION_DIR / "day_14_hip.jpg",
+    },
+    "case_custom": {
+        "day_1": PROGRESSION_DIR / "day_1_hip.jpg",
+        "final_day": PROGRESSION_DIR / "day_14_hip.jpg",
+    },
+}
+
+
+def get_progression_image_bytes(stage: str = "day_1", case_key: str = "case_a") -> bytes:
+    """
+    Returns realistic clinical medical photography for healing progression
+    (Day 1 fresh incision baseline vs Day 14 fully healed scar).
+    """
+    stage_key = "final_day" if stage.lower() in ("day_14", "final_day") else "day_1"
+    case_images = PROGRESSION_IMAGE_MAP.get(case_key, PROGRESSION_IMAGE_MAP["case_a"])
+    if stage_key in case_images:
+        p = case_images[stage_key]
+        if p.exists():
+            return p.read_bytes()
+    return create_synthetic_incision_image("normal")
+
+
+def get_case_image_bytes(case_key_or_type: str = "case_a") -> bytes:
+    """
+    Returns realistic clinical medical photography for the selected case study.
+    Falls back to synthetic illustration if the image file is unavailable.
+    """
+    if case_key_or_type in CASE_IMAGE_MAP:
+        img_path = CASE_IMAGE_MAP[case_key_or_type]
+        if img_path.exists():
+            return img_path.read_bytes()
+
+    if case_key_or_type == "infection":
+        inf_path = CASE_IMAGE_MAP.get("case_b")
+        if inf_path and inf_path.exists():
+            return inf_path.read_bytes()
+    elif case_key_or_type in ("normal", "dvt"):
+        norm_path = CASE_IMAGE_MAP.get("case_a")
+        if norm_path and norm_path.exists():
+            return norm_path.read_bytes()
+
+    return create_synthetic_incision_image(case_key_or_type)
 
 
 def create_synthetic_incision_image(case_type: str = "normal") -> bytes:
@@ -89,6 +153,7 @@ SAMPLE_CASES = {
         "reported_pain": 3,
         "temperature_f": 98.6,
         "case_type": "normal",
+        "image_path": str(ASSETS_DIR / "case_a_knee.jpg"),
         "summary_snippet": "Day 4 post-op knee replacement. Normal post-surgical healing with minimal serous exudate and intact surgical staples.",
         "discharge": DischargeSummary(
             procedure_name="Total Knee Arthroplasty (Left)",
@@ -180,6 +245,7 @@ SAMPLE_CASES = {
         "reported_pain": 7,
         "temperature_f": 101.2,
         "case_type": "infection",
+        "image_path": str(ASSETS_DIR / "case_b_appendix.jpg"),
         "summary_snippet": "Day 6 appendectomy. Presenting with fever 101.2°F, expanding umbilical incision erythema > 2.5cm, and early purulent drainage.",
         "discharge": DischargeSummary(
             procedure_name="Laparoscopic Appendectomy (Complicated)",
@@ -261,6 +327,7 @@ SAMPLE_CASES = {
         "reported_pain": 6,
         "temperature_f": 99.1,
         "case_type": "normal",
+        "image_path": str(ASSETS_DIR / "case_c_hip.jpg"),
         "summary_snippet": "Day 3 hip replacement. Hip incision itself is intact, but patient presents with acute right calf tenderness, swelling, and mild dyspnea (Suspected DVT/PE Emergency).",
         "discharge": DischargeSummary(
             procedure_name="Total Hip Arthroplasty (Right Anterior Approach)",
@@ -325,5 +392,79 @@ SAMPLE_CASES = {
             ]
         ),
         "mock_chat_query": "My hip incision looks clean, but my right calf is swollen, hot, and cramps terribly when I put my foot down. I also feel slightly out of breath."
+    },
+
+    "case_custom": {
+        "id": "PAT-USER",
+        "name": "Custom Patient",
+        "age": 45,
+        "procedure_name": "Post-Operative Wound Evaluation",
+        "surgery_date": "2026-09-14",
+        "post_op_day": 3,
+        "surgeon_name": "Dr. Attending Surgeon, MD",
+        "reported_pain": 3,
+        "temperature_f": 98.6,
+        "case_type": "custom",
+        "image_path": str(ASSETS_DIR / "case_a_knee.jpg"),
+        "summary_snippet": "Custom patient case: Upload your own incision photo, specify vitals, and parse your custom discharge paperwork.",
+        "discharge": DischargeSummary(
+            procedure_name="Post-Operative Wound Evaluation",
+            surgery_date="2026-09-14",
+            surgeon_name="Dr. Attending Surgeon, MD",
+            weight_bearing_status="Weight-bearing as tolerated or per surgical instructions.",
+            showering_guidelines="Shower permitted with waterproof dressing intact. Gently pat dry; do not soak in tub.",
+            wound_care_routine=[
+                "Inspect incision daily for erythema, warmth, or drainage.",
+                "Keep surgical dressing clean and dry.",
+                "Follow postoperative elevation and movement guidance."
+            ],
+            medications=[
+                MedicationItem(
+                    name="Acetaminophen / Prescribed Analgesic",
+                    dosage="Standard prescribed dose",
+                    frequency="Every 6-8 hours as needed",
+                    purpose="Baseline post-op pain management",
+                    instructions="Take with water after meals."
+                ),
+                MedicationItem(
+                    name="Prophylactic Antibiotic (if prescribed)",
+                    dosage="As directed",
+                    frequency="Twice daily",
+                    purpose="Infection prevention",
+                    instructions="Complete full prescribed regimen."
+                )
+            ],
+            emergency_symptoms=[
+                "Temperature greater than 100.4°F (38°C).",
+                "Spreading periwound redness expanding > 1.5 cm.",
+                "Foul odor or cloudy yellowish/purulent drainage.",
+                "Sudden calf swelling, warmth, or chest pain / shortness of breath."
+            ],
+            milestones=[
+                RecoveryMilestone(day_offset=1, title="Discharge home baseline", description="Safe departure from clinic or hospital.", is_completed=True),
+                RecoveryMilestone(day_offset=7, title="Post-op wound check", description="Clinical or telehealth wound progress evaluation.", is_completed=False),
+                RecoveryMilestone(day_offset=14, title="Follow-up & suture evaluation", description="Closure check and physical recovery assessment.", is_completed=False)
+            ]
+        ),
+        "expected_analysis": WoundAnalysisResult(
+            healing_status="Ready for AI Analysis",
+            erythema_score=1,
+            swelling_level="Mild",
+            drainage_type="None",
+            edge_approximation="Well-approximated (Cleanly Closed)",
+            infection_risk_percentage=10,
+            clinical_observations=[
+                "Custom patient case loaded.",
+                "Ready to evaluate uploaded clinical photo with Gemini 2.5 Flash Vision."
+            ],
+            patient_plain_english_summary="Your custom case is loaded! Upload your incision photo and click 'Run Gemini SSI Surveillance Analysis' to get an instant AI evaluation.",
+            red_flags=[],
+            action_recommendations=[
+                "Upload a clear, focused photo of the incision or use the webcam.",
+                "Update patient vitals (temperature and pain score) if known.",
+                "Click 'Run Gemini SSI Surveillance Analysis'."
+            ]
+        ),
+        "mock_chat_query": "How does my incision look today, and what signs of healing or infection should I watch for?"
     }
 }

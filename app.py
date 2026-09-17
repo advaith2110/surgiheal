@@ -6,7 +6,7 @@ import io
 
 import config
 import ai_service
-from sample_data import SAMPLE_CASES, create_synthetic_incision_image
+from sample_data import SAMPLE_CASES, create_synthetic_incision_image, get_case_image_bytes, get_progression_image_bytes
 from models import WoundAnalysisResult, DischargeSummary, TriageAssessment
 
 # Page configuration
@@ -108,11 +108,11 @@ with st.sidebar:
     st.subheader("⚡ 1-Click Hackathon Demo")
     demo_case = st.selectbox(
         "Select Clinical Case Study:",
-        options=["case_a", "case_b", "case_c"],
+        options=["case_a", "case_c", "case_custom"],
         format_func=lambda k: {
             "case_a": "Case A: Sarah Jenkins (Day 4 Knee - Normal)",
-            "case_b": "Case B: Marcus Vance (Day 6 Appendix - SSI Alert)",
-            "case_c": "Case C: Robert Chen (Day 3 Hip - DVT Red Flag)"
+            "case_c": "Case B: Robert Chen (Day 3 Hip - DVT Red Flag)",
+            "case_custom": "Case C: ➕ Custom Patient Case (Upload Your Own)"
         }[k],
         key="selected_case_select"
     )
@@ -126,6 +126,21 @@ with st.sidebar:
         st.rerun()
 
     active_case = SAMPLE_CASES[st.session_state.patient_case_key]
+
+    if demo_case == "case_custom":
+        with st.expander("✏️ Customize Patient Details", expanded=False):
+            c_name = st.text_input("Patient Name:", value=SAMPLE_CASES["case_custom"]["name"], key="c_name")
+            c_age = st.number_input("Age:", value=int(SAMPLE_CASES["case_custom"]["age"]), min_value=1, max_value=120, key="c_age")
+            c_proc = st.text_input("Procedure:", value=SAMPLE_CASES["case_custom"]["procedure_name"], key="c_proc")
+            c_day = st.number_input("Post-Op Day:", value=int(SAMPLE_CASES["case_custom"]["post_op_day"]), min_value=1, max_value=90, key="c_day")
+            c_surgeon = st.text_input("Surgeon:", value=SAMPLE_CASES["case_custom"]["surgeon_name"], key="c_surgeon")
+
+            SAMPLE_CASES["case_custom"]["name"] = c_name
+            SAMPLE_CASES["case_custom"]["age"] = c_age
+            SAMPLE_CASES["case_custom"]["procedure_name"] = c_proc
+            SAMPLE_CASES["case_custom"]["post_op_day"] = c_day
+            SAMPLE_CASES["case_custom"]["surgeon_name"] = c_surgeon
+            active_case = SAMPLE_CASES["case_custom"]
 
     st.divider()
     st.subheader("🔑 Gemini API Settings")
@@ -186,32 +201,47 @@ with tab_wound:
 
     with col_w1:
         st.markdown("### 📸 1. Incision Photo")
+        photo_options = ["Upload Photo (PNG/JPG)", "Webcam Snapshot", "Realistic Clinical Case Photo"] if st.session_state.patient_case_key == "case_custom" else ["Realistic Clinical Case Photo", "Upload Photo (PNG/JPG)", "Webcam Snapshot"]
         photo_source = st.radio(
             "Select Photo Source:",
-            ["Use Clinical Case Illustration", "Upload Photo (PNG/JPG)", "Webcam Snapshot"],
+            photo_options,
             horizontal=True
         )
 
         image_bytes = None
-        if photo_source == "Use Clinical Case Illustration":
-            image_bytes = create_synthetic_incision_image(active_case["case_type"])
-            st.image(image_bytes, caption=f"Incision Image — {active_case['procedure_name']} (Day {active_case['post_op_day']})", use_container_width=True)
-        elif photo_source == "Upload Photo (PNG/JPG)":
-            uploaded_file = st.file_uploader("Upload incision photo:", type=["png", "jpg", "jpeg"])
+        uploaded_current_photo = False
+        if photo_source == "Upload Photo (PNG/JPG)":
+            uploaded_file = st.file_uploader("Upload incision photo:", type=["png", "jpg", "jpeg"], key="wound_file_uploader")
             if uploaded_file:
                 image_bytes = uploaded_file.getvalue()
-                st.image(image_bytes, caption="Uploaded Incision", use_container_width=True)
+                st.session_state["uploaded_wound_img"] = image_bytes
+                st.session_state["uploaded_wound_case"] = st.session_state.patient_case_key
+                uploaded_current_photo = True
+                st.image(image_bytes, caption=f"Uploaded Incision Photo — {active_case['name']}", use_container_width=True)
+            elif (
+                "uploaded_wound_img" in st.session_state
+                and st.session_state.get("uploaded_wound_case") == st.session_state.patient_case_key
+            ):
+                image_bytes = st.session_state["uploaded_wound_img"]
+                uploaded_current_photo = True
+                st.image(image_bytes, caption=f"Uploaded Incision Photo — {active_case['name']} (Active)", use_container_width=True)
             else:
-                image_bytes = create_synthetic_incision_image(active_case["case_type"])
-                st.info("No file uploaded yet. Showing standard incision preview.")
-                st.image(image_bytes, caption="Sample Incision Preview", use_container_width=True)
-        else:
+                image_bytes = get_case_image_bytes(st.session_state.patient_case_key)
+                st.info("Upload your patient incision photo above, or review default case photo:")
+                st.image(image_bytes, caption="Case Incision Photo", use_container_width=True)
+        elif photo_source == "Webcam Snapshot":
             cam_file = st.camera_input("Take a photo of the incision:")
             if cam_file:
                 image_bytes = cam_file.getvalue()
+                st.session_state["uploaded_wound_img"] = image_bytes
+                st.session_state["uploaded_wound_case"] = st.session_state.patient_case_key
+                uploaded_current_photo = True
                 st.image(image_bytes, caption="Webcam Incision Photo", use_container_width=True)
             else:
-                image_bytes = create_synthetic_incision_image(active_case["case_type"])
+                image_bytes = get_case_image_bytes(st.session_state.patient_case_key)
+        else:
+            image_bytes = get_case_image_bytes(st.session_state.patient_case_key)
+            st.image(image_bytes, caption=f"Clinical Photo — {active_case['procedure_name']} (Day {active_case['post_op_day']})", use_container_width=True)
 
         st.markdown("### 🌡️ 2. Clinical Context & Vitals")
         col_v1, col_v2 = st.columns(2)
@@ -310,17 +340,19 @@ with tab_wound:
     pcol1, pcol2, pcol3 = st.columns(3)
     with pcol1:
         st.markdown("**Post-Op Day 1** (Discharge Baseline)")
-        st.image(create_synthetic_incision_image("normal"), caption="Day 1: Staples intact, minimal reactive pinkness", use_container_width=True)
+        st.image(get_progression_image_bytes("day_1", st.session_state.patient_case_key), caption=f"Day 1 ({active_case['procedure_name']} baseline)", use_container_width=True)
         st.caption("Erythema: 1/10 | Pain: 5/10 | SSI Risk: 5%")
 
     with pcol2:
-        st.markdown(f"**Post-Op Day {active_case['post_op_day']}** (Current)")
-        st.image(image_bytes, caption=f"Day {active_case['post_op_day']} Inspection", use_container_width=True)
+        current_label = "Uploaded Photo / Current Inspection" if uploaded_current_photo else f"Post-Op Day {active_case['post_op_day']} (Current)"
+        image_caption = "Uploaded wound photo" if uploaded_current_photo else f"Day {active_case['post_op_day']} clinical case photo"
+        st.markdown(f"**{current_label}**")
+        st.image(image_bytes, caption=image_caption, use_container_width=True)
         st.caption(f"Erythema: {result.erythema_score}/10 | Pain: {curr_pain}/10 | SSI Risk: {result.infection_risk_percentage}%")
 
     with pcol3:
-        st.markdown("**Post-Op Day 14 Target** (Staple / Suture Removal)")
-        st.image(create_synthetic_incision_image("normal"), caption="Expected Clean Scar Remodeling", use_container_width=True)
+        st.markdown("**Final Day** (Healed Incision)")
+        st.image(get_progression_image_bytes("final_day", st.session_state.patient_case_key), caption=f"Final day ({active_case['procedure_name']} healed target)", use_container_width=True)
         st.caption("Target Erythema: 0/10 | Target SSI Risk: < 3%")
 
 
@@ -330,6 +362,31 @@ with tab_wound:
 with tab_roadmap:
     st.subheader("Intelligent Discharge Paperwork & Recovery Plan")
     st.caption("Extracts surgical orders, medication tapering schedules, and hygiene milestones directly from hospital discharge summaries.")
+
+    if st.session_state.patient_case_key == "case_custom":
+        with st.expander("📤 Upload / Paste Custom Discharge Paperwork (AI Structured Parser)", expanded=True):
+            st.markdown("Paste real hospital discharge paperwork, doctor instructions, or medication orders to extract a personalized recovery roadmap:")
+            pasted_notes = st.text_area(
+                "Discharge Summary Text:",
+                height=120,
+                placeholder="e.g.: Patient discharged Day 1 post right knee arthroplasty by Dr. Vance. Instructions: Elevate operative leg. Weight-bearing as tolerated with walker. Shower allowed after 48 hours with Aquacel dressing sealed. Medications: Lovenox 40mg daily subcutaneously x 14 days, Tylenol 1000mg q8h PRN pain, Keflex 500mg BID x 7 days. Return to clinic Day 14 for staple removal.",
+                key="custom_discharge_input"
+            )
+            parse_col1, parse_col2 = st.columns([1, 2])
+            with parse_col1:
+                if st.button("⚡ Parse Discharge Orders with AI", type="secondary", use_container_width=True):
+                    if pasted_notes.strip():
+                        with st.spinner("Analyzing discharge instructions with Gemini 2.5 Flash..."):
+                            parsed_summary = ai_service.parse_discharge_document(
+                                document_text=pasted_notes,
+                                api_key=config.GEMINI_API_KEY
+                            )
+                            SAMPLE_CASES["case_custom"]["discharge"] = parsed_summary
+                            st.success("Recovery roadmap & medications extracted!")
+                            st.rerun()
+                    else:
+                        st.warning("Please paste or type discharge document text above.")
+        st.divider()
 
     discharge: DischargeSummary = active_case["discharge"]
 
@@ -541,6 +598,31 @@ with tab_surgeon:
             "Last Incision Update": "3 hours ago"
         }
     ]
+
+    if st.session_state.patient_case_key == "case_custom":
+        cp = SAMPLE_CASES["case_custom"]
+        c_res = st.session_state.analysis_results.get(cp["id"])
+        c_risk = f"{c_res.infection_risk_percentage}%" if c_res else "Pending"
+        c_status = "🟢 Active Surveillance"
+        if c_res:
+            if "Urgent" in c_res.healing_status:
+                c_status = "🔴 Urgent SSI Warning"
+            elif "Borderline" in c_res.healing_status:
+                c_status = "🟡 Needs Monitoring"
+            else:
+                c_status = "🟢 On Track / Normal"
+        registry_patients.insert(0, {
+            "Patient ID": cp["id"],
+            "Name": cp["name"],
+            "Procedure": cp["procedure_name"],
+            "Post-Op Day": f"Day {cp['post_op_day']}",
+            "Temp (°F)": float(cp["temperature_f"]),
+            "Pain (0-10)": int(cp["reported_pain"]),
+            "SSI Risk": c_risk,
+            "Triage Status": c_status,
+            "Last Incision Update": "Just now"
+        })
+
     df_reg = pd.DataFrame(registry_patients)
     st.dataframe(df_reg, use_container_width=True, hide_index=True)
 
