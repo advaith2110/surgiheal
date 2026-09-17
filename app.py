@@ -110,7 +110,7 @@ with st.sidebar:
         "Select Clinical Case Study:",
         options=["case_a", "case_custom"],
         format_func=lambda k: {
-            "case_a": "Case A: Sarah Jenkins (Day 4 Knee - Normal)",
+            "case_a": "Case A: Sarah Jenkins (Day 4 Forehead - Normal)",
             "case_custom": "➕ Custom Patient Case (Upload Your Own)"
         }[k],
         key="selected_case_select"

@@ -16,7 +16,7 @@ ASSETS_DIR = BASE_DIR / "assets" / "cases"
 PROGRESSION_DIR = BASE_DIR / "assets" / "progression"
 
 CASE_IMAGE_MAP = {
-    "case_a": ASSETS_DIR / "case_a_knee.jpg",
+    "case_a": ASSETS_DIR / "case_a_forehead.png",
     "case_b": ASSETS_DIR / "case_b_appendix.jpg",
     "case_c": ASSETS_DIR / "case_c_hip.jpg",
     "case_custom": ASSETS_DIR / "case_a_knee.jpg",
@@ -24,8 +24,8 @@ CASE_IMAGE_MAP = {
 
 PROGRESSION_IMAGE_MAP = {
     "case_a": {
-        "day_1": PROGRESSION_DIR / "day_1_knee_baseline.jpg",
-        "final_day": PROGRESSION_DIR / "day_14_knee_healed.jpg",
+        "day_1": PROGRESSION_DIR / "day_1_forehead.png",
+        "final_day": PROGRESSION_DIR / "day_14_forehead.png",
     },
     "case_c": {
         "day_1": PROGRESSION_DIR / "day_1_hip.jpg",
@@ -146,15 +146,15 @@ SAMPLE_CASES = {
         "id": "PAT-1082",
         "name": "Sarah Jenkins",
         "age": 62,
-        "procedure_name": "Total Knee Arthroplasty (Left Knee)",
+        "procedure_name": "Forehead Incision Repair",
         "surgery_date": "2026-09-10",
         "post_op_day": 4,
         "surgeon_name": "Dr. Eleanor Vance, MD (Orthopedic Surgery)",
         "reported_pain": 3,
         "temperature_f": 98.6,
         "case_type": "normal",
-        "image_path": str(ASSETS_DIR / "case_a_knee.jpg"),
-        "summary_snippet": "Day 4 post-op knee replacement. Normal post-surgical healing with minimal serous exudate and intact surgical staples.",
+        "image_path": str(ASSETS_DIR / "case_a_forehead.png"),
+        "summary_snippet": "Day 4 after forehead incision repair. Normal healing with minimal serous exudate and clean, intact closure.",
         "discharge": DischargeSummary(
             procedure_name="Total Knee Arthroplasty (Left)",
             surgery_date="2026-09-10",
